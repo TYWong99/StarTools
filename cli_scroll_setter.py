@@ -19,22 +19,9 @@ import logic.scroll_setter as main_logic
 #--------------------------------------------------#
 '''Adjustable Configurations'''
 
-# In-editor object layers for nodes & routes
-layer_name_node   = "navigation"
-layer_name_export = "navigation"
-
-
-
-
-
-# Passing configurations to logic
-passed_arguments = (
-	layer_name_node, 
-	layer_name_export
-)
-
-config_calculate_dist = True
-
+# Setting these to anything besides "1" would override the in-layer specifications
+parallax_x = "1"
+parallax_y = "1"
 
 
 
@@ -68,9 +55,8 @@ def main():
 	playdo = play.LevelPlayDo(file_utils.GetFullLevelPath(args.filename))
 
 	# Main Logic
-	parallax_x = "1.05"
-	parallax_y = "1.05"
 	main_logic.logic(playdo, parallax_x, parallax_y, args.raw)
+	log.Must("")
 
 	# Flush changes to File!
 	playdo.Write(make_auto_backup=True)

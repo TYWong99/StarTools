@@ -16,13 +16,6 @@ import logic.common.tiled_utils as tiled_utils
 #--------------------------------------------------#
 '''Variables'''
 
-# Output
-_output_folder1 = "output/"
-_output_folder2 = _output_folder1 + "levels/"
-_output_file    = _output_folder1 + "_merged.txt"
-
-
-input_layer_name  = "_scroll"
 output_layer_name = "_fg_parallax"  # If you add a / in the name, the app just crashes
 auto_layer_names = [
 	"raw_ BIOME _parallax",  # Input layer name of auto-tiling
@@ -31,6 +24,12 @@ auto_layer_names = [
 
 property_name = "scroll2"
 
+# Layer name, the first number is the in-editor parallax values
+# Having a second number means x- & y-values are different
+#  "_scroll 1.05"   -> (1.05, 1.05)
+#  "_scroll 1 1.05" -> (1   , 1.05)
+layer_prefix = "_scroll"
+split_char = " "
 
 
 #--------------------------------------------------#
@@ -38,37 +37,88 @@ property_name = "scroll2"
 
 def logic(playdo, scroll_x, scroll_y, make_auto_layers):
 	'''TODO'''
-	log.Must('')
-	log.Must(f'Creating modified layer with scroll factors, x = {scroll_x}, y = {scroll_y}...')
+	log.Extra('')
+	log.Must(f'Creating modified layer based on the reference scroll layer...')
+	log.Extra('')
 
-	# Set tile ID based on how much it's scrolling / stretching
-	ref_tiles2d = playdo.GetTiles2d(input_layer_name)
+	# Check which layer is being referenced, as well as the scroll values specified in layer name
+	ref_name, scroll_x, scroll_y = GetLayerNameAndScroll(playdo, scroll_x, scroll_y)
+	if ref_name == False: return
+
+	# Checking the size of the room and tilelayer, for logging purpose only
+	ref_tiles2d = playdo.GetTiles2d(ref_name)
 	level_w = playdo.map_width
 	level_h = playdo.map_height
-	CheckMapSize(playdo, scroll_x, scroll_y)
+	CheckMapSize(playdo, ref_name, scroll_x, scroll_y)
 
-	# Set tile IDs
+	# Set tile ID based on how much it's scrolling / stretching
+	log.Must('  Setting tile ID...')
 	mult_x = 1 / float(scroll_x)
 	mult_y = 1 / float(scroll_y)
 	new_tiles2d = playdo.GetBlankTiles2d()
 	for x in range(level_w):
 		ref_x = int(x * mult_x)
-		if ref_x > level_w: break
+		if ref_x >= level_w: break
 		for y in range(level_h):
 			ref_y = int(y * mult_y)
-			if ref_y > level_h: break
+			if ref_y >= level_h: break
 			new_tiles2d[y][x] = ref_tiles2d[ref_y][ref_x]
 	playdo.SetTiles2d(output_layer_name, new_tiles2d)
+	log.Extra('')
 
 	# Create a blank layer, then set the scrolling properties
+	log.Must('  Setting properties...')
 	AddParallaxToLayer(playdo, output_layer_name, scroll_x, scroll_y, True)
 	if make_auto_layers:
-		for auto_name in auto_layer_names: AddParallaxToLayer(playdo, auto_name, scroll_x, scroll_y, False)
+		for auto_name in auto_layer_names: AddParallaxToLayer(playdo, auto_name, scroll_x, scroll_y, True)
+	log.Extra('')
 
 
 
-def CheckMapSize(playdo, scroll_x, scroll_y):
-	ref_tiles2d = playdo.GetTiles2d(input_layer_name)
+
+
+def GetLayerNameAndScroll(playdo, scroll_x, scroll_y):
+	'''TODO'''
+	ERROR_VALUE = False, False, False
+
+	# Check which layer is being referenced
+	list_names = playdo.GetAllTileLayerNames()
+	ref_name = None
+	for name in list_names:
+		if not name.startswith(layer_prefix): continue
+		ref_name = name
+		break
+	if ref_name == None:
+		log.Must( "  ERROR! Reference layer not found!")
+		log.Must(f"    Make sure to have a layer starting with \"{layer_prefix}\", then specify scroll values")
+		log.Must( "    Example: \"_scroll 1.05\" \"_scroll 1 1.05\"")
+		return ERROR_VALUE
+
+	# Skip name-checking if scroll values are overridden
+	if not (scroll_x == "1" and scroll_y == "1"): return ref_name, scroll_x, scroll_y
+
+	# Get scroll values
+	temp = ref_name.replace(layer_prefix, "").split(split_char)
+	if temp == ['']:
+		log.Must( "  ERROR! Reference layer is not in correct name format!")
+		log.Must(f"    Make sure to have a number specifying scroll values")
+		log.Must( "    Example: \"_scroll 1.05\" \"_scroll 1 1.05\"")
+		return ERROR_VALUE
+	temp.pop(0)  # First element is always '' somehow
+	scroll_x = temp[0]
+	if len(temp) >= 2: scroll_y = temp[1]
+	else:              scroll_y = scroll_x
+	log.Must(f'  Referenced layer is \"{ref_name}\", with parallax values X = {scroll_x}, Y = {scroll_y}...')
+	log.Extra('')
+
+	return ref_name, scroll_x, scroll_y
+
+
+
+
+
+def CheckMapSize(playdo, ref_name, scroll_x, scroll_y):
+	ref_tiles2d = playdo.GetTiles2d(ref_name)
 	level_w = playdo.map_width
 	level_h = playdo.map_height
 	log.Info(f"  Map Size W x H    : {level_w} x {level_h}")
@@ -93,6 +143,7 @@ def CheckMapSize(playdo, scroll_x, scroll_y):
 	is_level_big_enough = (new_w <= level_w) and (new_h <= level_h)
 	log.Info(f"    Map Requirement : {new_w} x {new_h}")
 	log.Info(f"      Is level big enough? {is_level_big_enough}")
+	log.Extra('')
 
 
 
@@ -108,10 +159,12 @@ def AddParallaxToLayer(playdo, layer_name, scroll_x, scroll_y, set_properties = 
 	new_layer.set("offsetx", "-8") # Always shift layer by a certain amount?
 	new_layer.set("offsety", "-8")
 	if set_properties: tiled_utils.SetPropertyOnObject(new_layer, "scroll2", "")
+
+	msg = f'    \"{layer_name}\"'
+	if set_properties: msg += f' \t(with \"{property_name}\" property)'
+	log.Info(msg)
+
 	return new_layer
-#   <layer id="1334" name="raw_spleen_parallax" width="69" height="41" visible="0" parallaxx="1.05" parallaxy="1.05">
-
-
 
 
 
