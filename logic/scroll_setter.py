@@ -17,11 +17,6 @@ import logic.common.tiled_utils as tiled_utils
 '''Variables'''
 
 output_layer_name = "_fg_parallax"  # If you add a / in the name, the app just crashes
-auto_layer_names = [
-	"raw_ BIOME _parallax",  # Input layer name of auto-tiling
-	"_fg_parallax BIOME",    # Output layer name of auto-tiling
-]
-
 property_name = "scroll2"
 
 # Layer name, the first number is the in-editor parallax values
@@ -30,6 +25,20 @@ property_name = "scroll2"
 #  "_scroll 1 1.05" -> (1   , 1.05)
 layer_prefix = "_scroll"
 split_char = " "
+
+# The tilelayer for highlighting the border needed when setting parallax
+border_marker_name = "_parallax marker"    # Layer name
+border_thickness   = 3
+border_tile_id     = 1036+1
+
+# Layers automatically generated
+auto_layer_names = [
+	"raw_ BIOME _parallax",  # Input layer name of auto-tiling
+	"_fg_parallax BIOME",    # Output layer name of auto-tiling
+	border_marker_name,
+]
+opacity_value = "0.5"
+
 
 
 #--------------------------------------------------#
@@ -66,14 +75,36 @@ def logic(playdo, scroll_x, scroll_y, make_auto_layers):
 	playdo.SetTiles2d(output_layer_name, new_tiles2d)
 	log.Extra('')
 
+	# Create border layer
+	if mult_x < 1: SetBorderLayer(playdo)
+
 	# Create a blank layer, then set the scrolling properties
 	log.Must('  Setting properties...')
 	AddParallaxToLayer(playdo, output_layer_name, scroll_x, scroll_y, True)
 	if make_auto_layers:
-		for auto_name in auto_layer_names: AddParallaxToLayer(playdo, auto_name, scroll_x, scroll_y, True)
+		for auto_name in auto_layer_names: AddParallaxToLayer(playdo, auto_name, scroll_x, scroll_y, False, True)
 	log.Extra('')
 
 
+
+def SetBorderLayer(playdo):
+	'''TODO'''
+	log.Must('  Setting border layer...')
+	level_w = playdo.map_width
+	level_h = playdo.map_height
+	new_tiles2d = playdo.GetBlankTiles2d()
+
+	min_x = border_thickness-1
+	max_x = level_w - border_thickness
+	min_y = border_thickness-1
+	max_y = level_h - border_thickness
+
+	for x in range(level_w):
+		for y in range(level_h):
+			if (min_x < x and x < max_x) and (min_y < y and y < max_y): continue
+			new_tiles2d[y][x] = border_tile_id
+	playdo.SetTiles2d(border_marker_name, new_tiles2d)
+	log.Extra('')
 
 
 
@@ -133,13 +164,15 @@ def CheckMapSize(playdo, ref_name, scroll_x, scroll_y):
 		if ref_tiles2d[i][0] != 0: continue
 		layer_h = i
 		break
+	if layer_w == -1: layer_w = level_w
+	if layer_h == -1: layer_h = level_h
 	log.Info(f"    Tilelayer Size  : {layer_w} x {layer_h}")
 
 	# Estimate new width & height
 	mult_x = 1 / float(scroll_x)
 	mult_y = 1 / float(scroll_y)
-	new_w = int(layer_w / mult_x)
-	new_h = int(layer_h / mult_y)
+	new_w = int(layer_w / mult_x) + 1
+	new_h = int(layer_h / mult_y) + 1
 	is_level_big_enough = (new_w <= level_w) and (new_h <= level_h)
 	log.Info(f"    Map Requirement : {new_w} x {new_h}")
 	log.Info(f"      Is level big enough? {is_level_big_enough}")
@@ -151,14 +184,15 @@ def CheckMapSize(playdo, ref_name, scroll_x, scroll_y):
 
 
 
-def AddParallaxToLayer(playdo, layer_name, scroll_x, scroll_y, set_properties = False):
+def AddParallaxToLayer(playdo, layer_name, scroll_x, scroll_y, set_properties = False, set_opacity = False):
 	'''This only adds the attributes to the layer, without affecting the Tiles2d itself'''
 	new_layer = playdo.GetTilelayer(layer_name, False)
 	new_layer.set("parallaxx", scroll_x)
 	new_layer.set("parallaxy", scroll_y)
-	new_layer.set("offsetx", "-8") # Always shift layer by a certain amount?
-	new_layer.set("offsety", "-8")
+#	new_layer.set("offsetx", "-8") # Always shift layer by a certain amount?
+#	new_layer.set("offsety", "-8")
 	if set_properties: tiled_utils.SetPropertyOnObject(new_layer, "scroll2", "")
+	if set_opacity:    new_layer.set("opacity", opacity_value)
 
 	msg = f'    \"{layer_name}\"'
 	if set_properties: msg += f' \t(with \"{property_name}\" property)'
