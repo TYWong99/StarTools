@@ -1,6 +1,8 @@
 '''
-Logic module that can
- - TBA
+Logic module for scroll tool:
+ - Output a layer after applying scroll2
+ - Output a layer with scrolling border
+ - Print in log the expected map size
 
 USAGE EXAMPLE:
 	main_logic.logic(playdo)
@@ -9,7 +11,6 @@ USAGE EXAMPLE:
 	conflict.FixConflicts(playdo, pruned_dict)
 '''
 
-import os
 import logic.common.log_utils as log
 import logic.common.tiled_utils as tiled_utils
 
@@ -76,70 +77,6 @@ def logic(playdo, scroll_x, scroll_y, make_auto_layers):
 
 
 
-#-----------------------------------------------------------#
-# -------------------- [Tiles2D Edits] -------------------- #
-
-def ModifyScrollLayer(playdo, ref_name, scroll_x, scroll_y):
-	'''
-	 Edit the layer with scroll values
-	'''
-	# Checking the size of the room and tilelayer, for logging purpose only
-	level_w = playdo.map_width
-	level_h = playdo.map_height
-
-	# Set tile ID based on how much it's scrolling / stretching
-	log.Must('  Setting tile ID...')
-	mult_x = 1 / float(scroll_x)
-	mult_y = 1 / float(scroll_y)
-	ref_tiles2d = playdo.GetTiles2d(ref_name)
-	new_tiles2d = playdo.GetBlankTiles2d()
-	for x in range(level_w):
-		ref_x = int(x * mult_x)	+ 1
-		if ref_x <  0:       continue
-		if ref_x >= level_w: break
-		for y in range(level_h):
-			ref_y = int(y * mult_y) + 1
-			if ref_y <  0:       continue
-			if ref_y >= level_h: break
-			new_tiles2d[y][x] = ref_tiles2d[ref_y][ref_x]
-	playdo.SetTiles2d(output_layer_name, new_tiles2d)
-	log.Extra('')
-	return mult_x
-
-
-
-
-
-#----------------------------------------------------#
-# -------------------- [Border] -------------------- #
-
-def SetBorderLayer(playdo, thickness, tile_id):
-	'''
-	 Set tiles ID around the border of the level of a specific layer
-	 If a layer is absent, new layer would be created.
-	'''
-	log.Must('  Setting border layer...')
-	level_w = playdo.map_width
-	level_h = playdo.map_height
-	new_tiles2d = playdo.GetTiles2d(border_marker_name)
-	if new_tiles2d == None: new_tiles2d = playdo.GetBlankTiles2d()
-
-	min_x = thickness-1
-	max_x = level_w - thickness
-	min_y = thickness-1
-	max_y = level_h - thickness
-
-	for x in range(level_w):
-		for y in range(level_h):
-			if (min_x < x and x < max_x) and (min_y < y and y < max_y): continue
-			new_tiles2d[y][x] = tile_id
-	playdo.SetTiles2d(border_marker_name, new_tiles2d)
-	log.Extra('')
-
-
-
-
-
 #-------------------------------------------------------#
 # -------------------- [Recognize] -------------------- #
 
@@ -186,8 +123,6 @@ def GetLayerNameAndScroll(playdo, scroll_x, scroll_y):
 
 
 
-
-
 def CheckMapSize(playdo, ref_name, scroll_x, scroll_y):
 	'''
 	 No practical effect.
@@ -225,6 +160,35 @@ def CheckMapSize(playdo, ref_name, scroll_x, scroll_y):
 
 
 
+#-----------------------------------------------------------#
+# -------------------- [Tiles2D Edits] -------------------- #
+
+def ModifyScrollLayer(playdo, ref_name, scroll_x, scroll_y):
+	'''
+	 Edit the layer with scroll values
+	'''
+	# Checking the size of the room and tilelayer, for logging purpose only
+	level_w = playdo.map_width
+	level_h = playdo.map_height
+
+	# Set tile ID based on how much it's scrolling / stretching
+	log.Must('  Setting tile ID...')
+	mult_x = 1 / float(scroll_x)
+	mult_y = 1 / float(scroll_y)
+	ref_tiles2d = playdo.GetTiles2d(ref_name)
+	new_tiles2d = playdo.GetBlankTiles2d()
+	for x in range(level_w):
+		ref_x = int(x * mult_x)	+ 1
+		if ref_x <  0:       continue
+		if ref_x >= level_w: break
+		for y in range(level_h):
+			ref_y = int(y * mult_y) + 1
+			if ref_y <  0:       continue
+			if ref_y >= level_h: break
+			new_tiles2d[y][x] = ref_tiles2d[ref_y][ref_x]
+	playdo.SetTiles2d(output_layer_name, new_tiles2d)
+	log.Extra('')
+	return mult_x
 
 
 
@@ -248,6 +212,32 @@ def AddParallaxToLayer(playdo, layer_name, scroll_x, scroll_y, set_properties = 
 	return new_layer
 
 
+
+#----------------------------------------------------#
+# -------------------- [Border] -------------------- #
+
+def SetBorderLayer(playdo, thickness, tile_id):
+	'''
+	 Set tiles ID around the border of the level of a specific layer
+	 If a layer is absent, new layer would be created.
+	'''
+	log.Must('  Setting border layer...')
+	level_w = playdo.map_width
+	level_h = playdo.map_height
+	new_tiles2d = playdo.GetTiles2d(border_marker_name)
+	if new_tiles2d == None: new_tiles2d = playdo.GetBlankTiles2d()
+
+	min_x = thickness-1
+	max_x = level_w - thickness
+	min_y = thickness-1
+	max_y = level_h - thickness
+
+	for x in range(level_w):
+		for y in range(level_h):
+			if (min_x < x and x < max_x) and (min_y < y and y < max_y): continue
+			new_tiles2d[y][x] = tile_id
+	playdo.SetTiles2d(border_marker_name, new_tiles2d)
+	log.Extra('')
 
 
 
