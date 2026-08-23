@@ -13,8 +13,8 @@ import os
 import logic.common.log_utils as log
 import logic.common.tiled_utils as tiled_utils
 
-#--------------------------------------------------#
-'''Variables'''
+#-------------------------------------------------------#
+# -------------------- [Variables] -------------------- #
 
 output_layer_name = "_fg_parallax"  # If you add a / in the name, the app just crashes
 property_name = "scroll2"
@@ -28,8 +28,8 @@ split_char = " "
 
 # The tilelayer for highlighting the border needed when setting parallax
 border_marker_name = "_parallax marker"    # Layer name
-border_thickness   = 3
-border_tile_id     = 1036+1
+border_tile_id_r   = 1039+1
+border_tile_id_g   = 1037+1
 
 # Layers automatically generated
 auto_layer_names = [
@@ -41,8 +41,8 @@ opacity_value = "0.5"
 
 
 
-#--------------------------------------------------#
-'''Public Functions'''
+#--------------------------------------------------------------#
+# -------------------- [Public Functions] -------------------- #
 
 def logic(playdo, scroll_x, scroll_y, make_auto_layers):
 	'''TODO'''
@@ -54,29 +54,16 @@ def logic(playdo, scroll_x, scroll_y, make_auto_layers):
 	ref_name, scroll_x, scroll_y = GetLayerNameAndScroll(playdo, scroll_x, scroll_y)
 	if ref_name == False: return
 
-	# Checking the size of the room and tilelayer, for logging purpose only
-	ref_tiles2d = playdo.GetTiles2d(ref_name)
-	level_w = playdo.map_width
-	level_h = playdo.map_height
+	# Prints in log, doesn't modify any layer
 	CheckMapSize(playdo, ref_name, scroll_x, scroll_y)
 
-	# Set tile ID based on how much it's scrolling / stretching
-	log.Must('  Setting tile ID...')
-	mult_x = 1 / float(scroll_x)
-	mult_y = 1 / float(scroll_y)
-	new_tiles2d = playdo.GetBlankTiles2d()
-	for x in range(level_w):
-		ref_x = int(x * mult_x)
-		if ref_x >= level_w: break
-		for y in range(level_h):
-			ref_y = int(y * mult_y)
-			if ref_y >= level_h: break
-			new_tiles2d[y][x] = ref_tiles2d[ref_y][ref_x]
-	playdo.SetTiles2d(output_layer_name, new_tiles2d)
-	log.Extra('')
+	# Creates a new layer based on reference layers and the scroll values
+	mult_x = ModifyScrollLayer(playdo, ref_name, scroll_x, scroll_y)
 
-	# Create border layer
-	if mult_x < 1: SetBorderLayer(playdo)
+	# Create border layer - 3 tiles red that shouldn't be visible, 1 green that should be half-visible
+	if mult_x < 1:
+		SetBorderLayer(playdo, 4, border_tile_id_g)
+		SetBorderLayer(playdo, 3, border_tile_id_r)
 
 	# Create a blank layer, then set the scrolling properties
 	log.Must('  Setting properties...')
@@ -87,29 +74,82 @@ def logic(playdo, scroll_x, scroll_y, make_auto_layers):
 
 
 
-def SetBorderLayer(playdo):
-	'''TODO'''
+
+
+#-----------------------------------------------------------#
+# -------------------- [Tiles2D Edits] -------------------- #
+
+def ModifyScrollLayer(playdo, ref_name, scroll_x, scroll_y):
+	'''
+	 Edit the layer with scroll values
+	'''
+	# Checking the size of the room and tilelayer, for logging purpose only
+	level_w = playdo.map_width
+	level_h = playdo.map_height
+
+	# Set tile ID based on how much it's scrolling / stretching
+	log.Must('  Setting tile ID...')
+	mult_x = 1 / float(scroll_x)
+	mult_y = 1 / float(scroll_y)
+	ref_tiles2d = playdo.GetTiles2d(ref_name)
+	new_tiles2d = playdo.GetBlankTiles2d()
+	for x in range(level_w):
+		ref_x = int(x * mult_x)	+ 1
+		if ref_x <  0:       continue
+		if ref_x >= level_w: break
+		for y in range(level_h):
+			ref_y = int(y * mult_y) + 1
+			if ref_y <  0:       continue
+			if ref_y >= level_h: break
+			new_tiles2d[y][x] = ref_tiles2d[ref_y][ref_x]
+	playdo.SetTiles2d(output_layer_name, new_tiles2d)
+	log.Extra('')
+	return mult_x
+
+
+
+
+
+#----------------------------------------------------#
+# -------------------- [Border] -------------------- #
+
+def SetBorderLayer(playdo, thickness, tile_id):
+	'''
+	 Set tiles ID around the border of the level of a specific layer
+	 If a layer is absent, new layer would be created.
+	'''
 	log.Must('  Setting border layer...')
 	level_w = playdo.map_width
 	level_h = playdo.map_height
-	new_tiles2d = playdo.GetBlankTiles2d()
+	new_tiles2d = playdo.GetTiles2d(border_marker_name)
+	if new_tiles2d == None: new_tiles2d = playdo.GetBlankTiles2d()
 
-	min_x = border_thickness-1
-	max_x = level_w - border_thickness
-	min_y = border_thickness-1
-	max_y = level_h - border_thickness
+	min_x = thickness-1
+	max_x = level_w - thickness
+	min_y = thickness-1
+	max_y = level_h - thickness
 
 	for x in range(level_w):
 		for y in range(level_h):
 			if (min_x < x and x < max_x) and (min_y < y and y < max_y): continue
-			new_tiles2d[y][x] = border_tile_id
+			new_tiles2d[y][x] = tile_id
 	playdo.SetTiles2d(border_marker_name, new_tiles2d)
 	log.Extra('')
 
 
 
+
+
+#-------------------------------------------------------#
+# -------------------- [Recognize] -------------------- #
+
 def GetLayerNameAndScroll(playdo, scroll_x, scroll_y):
-	'''TODO'''
+	'''
+	 Returns a tuple value for the recognized scroll values
+	  - Layer name, to be fetched the tiles2d more conveniently
+	  - Scroll value in x-axis
+	  - Scroll value in y-axis
+	'''
 	ERROR_VALUE = False, False, False
 
 	# Check which layer is being referenced
@@ -149,6 +189,11 @@ def GetLayerNameAndScroll(playdo, scroll_x, scroll_y):
 
 
 def CheckMapSize(playdo, ref_name, scroll_x, scroll_y):
+	'''
+	 No practical effect.
+	 Prints out in log, of how big the level should be based on the pre-scroll sizes and scroll values
+	 Also checks whether the current level is big enough. 
+	'''
 	ref_tiles2d = playdo.GetTiles2d(ref_name)
 	level_w = playdo.map_width
 	level_h = playdo.map_height
@@ -171,8 +216,8 @@ def CheckMapSize(playdo, ref_name, scroll_x, scroll_y):
 	# Estimate new width & height
 	mult_x = 1 / float(scroll_x)
 	mult_y = 1 / float(scroll_y)
-	new_w = int(layer_w / mult_x) + 1
-	new_h = int(layer_h / mult_y) + 1
+	new_w = int(layer_w / mult_x)
+	new_h = int(layer_h / mult_y)
 	is_level_big_enough = (new_w <= level_w) and (new_h <= level_h)
 	log.Info(f"    Map Requirement : {new_w} x {new_h}")
 	log.Info(f"      Is level big enough? {is_level_big_enough}")
@@ -183,6 +228,8 @@ def CheckMapSize(playdo, ref_name, scroll_x, scroll_y):
 
 
 
+#--------------------------------------------------------#
+# -------------------- [Attributes] -------------------- #
 
 def AddParallaxToLayer(playdo, layer_name, scroll_x, scroll_y, set_properties = False, set_opacity = False):
 	'''This only adds the attributes to the layer, without affecting the Tiles2d itself'''
@@ -204,23 +251,8 @@ def AddParallaxToLayer(playdo, layer_name, scroll_x, scroll_y, set_properties = 
 
 
 
-#--------------------------------------------------#
-'''General Utility, to be relocated?'''
-
-def _Indent(s, min_len):
-	'''Return the same string, with consistent spacing added to the end'''
-	return ( s + ' ' * (min_len-len(s)) )
-
-def _FormatNumS2TU(num_in_str):
-	'''Shortcut, for converting string (coordinates measured in pixels) intoto Tiled units'''
-	if num_in_str == None: return ''
-	return str(int( round(float(num_in_str))/16 ))
-
-
-
-
-
-#--------------------------------------------------#
+#------------------------------------------------------#
+# -------------------- [Template] -------------------- #
 
 
 
