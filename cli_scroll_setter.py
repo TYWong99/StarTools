@@ -1,12 +1,13 @@
 '''
-Command-Line Tool for ... TBA
+Command-Line Tool for setting scroll2 property.
 	
 USAGE EXAMPLE:
 	cd /Users/Jimmy/20-GitHub/StarTools
-	clear; python cli_scroll_setter.py w05 --v 2
-	clear; python cli_scroll_setter.py w05 --v 2 --raw
+	clear; python tool_scroll_setter.py w05 --v 2
+	clear; python tool_scroll_setter.py w05 --v 2 --raw
+	clear; python tool_scroll_setter.py w05 --v 2 --raw --rewind
 	python cli_view.py w05
-	^^^ NOTE recommended to also use with this ^^^
+	^^^ NOTE recommended to also use the view tool to create fixed camera border ^^^
 
 '''
 import argparse

@@ -2,6 +2,7 @@
 Logic module for scroll tool:
  - Output a layer after applying scroll2
  - Output a layer with scrolling border
+ - Set the "scroll2" property to output layers
  - Print in log the expected map size
 
 USAGE EXAMPLE:
