@@ -285,6 +285,7 @@ def RenameTilelayer(playdo):
             if anchor_name_fg in name_aft:
                 new_name = anchor_name_fg2
                 if "/fx" in name_aft: new_name += "/fx"
+                _RenameTilelayer(playdo, name_aft, new_name)
                 list_name_bef_aft[index] = (name_bef, new_name)
                 break
 
