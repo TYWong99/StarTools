@@ -36,7 +36,8 @@ _LIST_PATTERN_BB = [
     "mermaid_1x1",
     "mermaid_1x1b",
     "mermaid_2x2",
-    "mermaid_w_slope"
+    "mermaid_w_slope",
+    "wyrm_bb_dome",
 ]
 
 # Ground and Slopes
@@ -140,7 +141,11 @@ def main():
     pattern_matcher_crystal.FindAndCreate(playdo, "fg_crystal", "collisions_crystal", allow_overlap = False)
     pattern_matcher_asteroid.FindAndCreate(playdo, "_asteroids", "objects_asteroids", allow_overlap = False)
     
-    VB.VaryBreakBlocks(playdo)
+    # 🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴
+    VB.VaryBreakBlocks(playdo) # This was the SITE of a BUG!!! I couldn't make head or heels of why Wyrm 
+    # Dome BB's would get new unknowable rotations and orientations. It was because of Vary Blocks! 🤦
+    # 🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴
+    
     # Flush changes to File!
     playdo.Write(make_auto_backup=True)
 
