@@ -3,7 +3,7 @@ Command-Line Tool for ... TBA
 	
 USAGE EXAMPLE:
 	cd /Users/Jimmy/20-GitHub/StarTools
-	clear; python cli_tiles_diff_check.py
+	clear; python tool_tiles_update.py
 
 '''
 import argparse
