@@ -1,6 +1,9 @@
 '''
-Command-Line Tool for ... TBA
-	
+Command-Line Tool for comparing 2 tilesheets
+ - The difference in pixels, as well as affected tiles, are highlight in a separate image
+ - The highlight image is automatically opened with the user-specified viewing app
+ - The highlight image is temporarily created at the tool folder, and automatically deleted afterwards
+
 USAGE EXAMPLE:
 	cd /Users/Jimmy/20-GitHub/StarTools
 	clear; python tool_tiles_update.py
@@ -13,6 +16,7 @@ import logic.common.file_utils as file_utils
 import os
 import shutil
 import subprocess
+import numpy as np
 from PIL import Image, ImageChops, ImageDraw
 
 #---------------------------------------------------------------------#
@@ -34,15 +38,12 @@ config_user["Quang"] = {
 	"app_path":        r"C:\Program Files\ImageGlass\ImageGlass.exe",
 	"folder_download": r"E:\Downloads",
 	"folder_current":  r"C:\Users\qtran\Desktop\PROJECT Whale Nebula\StarIliad\Assets\Graphics",
-#	"app_path":        "C:\\Program Files\\ImageGlass\\ImageGlass.exe",
-#	"folder_download": "E:\\Downloads\\",
-#	"folder_current":  "C:\\Users\\qtran\\Desktop\\PROJECT Whale Nebula\\StarIliad\\Assets\\Graphics\\",
 }
 
 # Color of the pixels in the output hignlight tilesheet
-hex_base  = '#000000' # Black
-hex_pixel = '#00FFFF' # Bright blue
-hex_tile  = '#FF0000' # Red
+hex_base  = '#000000' # Base color of the sheet
+hex_tile  = '#FF0000' # Base color of the tile altered
+hex_pixel = '#00FFFF' # Color of all the changed pixels
 
 
 
@@ -51,8 +52,7 @@ hex_tile  = '#FF0000' # Red
 #------------------------------------------------#
 #-------------------- [Main] --------------------#
 
-arg_description = 'Process a tiled level XML and <TBA>'
-arg_help1 = 'Name of the tiled level XML'
+arg_description = 'Compare 2 tilesheets in the designated filepaths'
 arg_help2 = 'Controls the amount of information displayed to screen. 0 = nearly silent, 2 = verbose'
 
 
@@ -78,10 +78,15 @@ def main():
 	if not os.path.exists(img_path_pj): log.Must(f"[ERROR] In-Project Tilesheet PNG not found at {img_path_pj}"); return
 
 	# Step 1 - Check diff, then output the diff PNG
-	log.Must(f"  Checking the following:\n    {img_path_dl}\n  with\n    {img_path_pj}")
+	log.Must(f"  Checking the new tilesheet:\n    {img_path_dl}\n  with the existing one:\n    {img_path_pj}")
 	compare_images(img_path_dl, img_path_pj, filepath_diff_highlight)
-	log.Must(f"  Difference highlight saved to: {filepath_diff_highlight}")
 	log.Must("")
+	log.Must(f"  Difference highlight temporarily created at:\n   {filepath_diff_highlight}")
+	log.Must("")
+
+	# Optional
+	is_match = images_are_identical(img_path_dl, img_path_pj)
+	if is_match: log.Must("  The 2 tilesheets are identical. Exiting tool now...\n"); os.remove(filepath_diff_highlight); return
 
 	# Step 2 - Open image automatically
 	try:
@@ -92,9 +97,10 @@ def main():
 
 	# Step 3 - Ask user to confirm changes
 	user_input = input(f"  Copy tilesheet to new location? (Y/N) ")
-	if user_input[0].lower() != 'y': log.Must(''); log.Must("  No changes applied.\n"); os.remove(filepath_diff_highlight); return
-	os.remove(filepath_diff_highlight)
-	log.Must("")
+	if user_input[0].lower() != 'y':
+		log.Must("\n  No changes applied.\n"); os.remove(filepath_diff_highlight); return
+	else:
+		log.Must("");                          os.remove(filepath_diff_highlight)
 
 	# Step 4 - Copy tilesheet to new location
 	shutil.copy(img_path_dl, img_path_pj)
@@ -109,6 +115,7 @@ def main():
 #-------------------- [Logic] --------------------#
 
 def compare_images(image1_path, image2_path, output_path, grid_size=16):
+	'''Read the PNG in the 2 filepaths, then create a new PNG that highlights the difference'''
 	with Image.open(image1_path) as image1, Image.open(image2_path) as image2:
 		if image1.size != image2.size:
 			raise ValueError(
@@ -150,7 +157,17 @@ def compare_images(image1_path, image2_path, output_path, grid_size=16):
 		output.paste(red, mask=mask)
 
 		output.save(output_path)
-#        print(f"Difference image saved to: {output_path}")
+#		print(f"Difference image saved to: {output_path}")
+
+def images_are_identical(img1_path, img2_path):
+	'''Returns True / False depending on whether the 2 images are identical'''
+	with Image.open(img1_path) as img1, Image.open(img2_path) as img2:
+		# Convert images to NumPy arrays
+		arr1 = np.array(img1)
+		arr2 = np.array(img2)
+		
+		# Check if the arrays are strictly identical in shape and pixel values
+		return np.array_equal(arr1, arr2)
 
 
 
