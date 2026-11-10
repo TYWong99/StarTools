@@ -135,6 +135,34 @@ def compare_images(image1_path, image2_path, output_path, grid_size=16):
 			mask = ImageChops.lighter(mask, channel)
 		mask = mask.point(lambda value: 255 if value > 0 else 0)
 
+
+
+		# NOTE This snippet is a replacement of the above to account for transparent pixel
+		# Differences in RGB, ignoring alpha for the moment
+		rgb_mask = channels[0]
+		for channel in channels[1:3]:
+			rgb_mask = ImageChops.lighter(rgb_mask, channel)
+		rgb_mask = rgb_mask.point(lambda value: 255 if value > 0 else 0)
+
+		# Differences in alpha still count
+		alpha_mask = channels[3].point(lambda value: 255 if value > 0 else 0)
+
+		# Find pixels that are transparent in both images
+		transparent1 = image1.getchannel("A").point( lambda alpha: 255 if alpha == 0 else 0 )
+		transparent2 = image2.getchannel("A").point( lambda alpha: 255 if alpha == 0 else 0 )
+		both_transparent = ImageChops.darker(transparent1, transparent2)
+
+		# Ignore RGB differences for pixels transparent in both images
+		visible_mask = ImageChops.invert(both_transparent)
+		rgb_mask = ImageChops.multiply(rgb_mask, visible_mask)
+
+		# A pixel differs if its visible RGB differs or its alpha differs
+		mask = ImageChops.lighter(rgb_mask, alpha_mask)
+
+
+
+
+
 		width, height = image1.size
 		output = Image.new("RGB", image1.size, hex_base)
 		draw = ImageDraw.Draw(output)
