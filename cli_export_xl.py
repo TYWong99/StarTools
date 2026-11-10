@@ -1,27 +1,24 @@
 '''
-Command-Line Tool for ... TBA
+Command-Line Tool for reading a simplified map XML, then creates a XLSX file at desktop
+The new XLSX contains the coloring data from the XML, and can then be imported into Google Sheet
 	
 USAGE EXAMPLE:
 	cd /Users/Jimmy/20-GitHub/StarTools
 	clear; python cli_export_xl.py
-
 '''
 import argparse
 import logic.common.log_utils as log
 import logic.common.file_utils as file_utils
-import logic.common.backup_utils as backup_utils
 import logic.common.level_playdo as play
 import logic.standalone.export_xlsx as main_logic
-
-import openpyxl
 
 #---------------------------------------------------------------------#
 #-------------------- [Adjustable Configurations] --------------------#
 
 # In-editor object layers for nodes & routes
 level_name_input = "map_simplified.xml"
-filepath_output  = r"C:\Users\qtran\Desktop\whale_map.xlsx"    # Quang's path
 filepath_output  =  "/Users/Jimmy/Desktop/whale_map.xlsx"      # TY's path
+filepath_output  = r"C:\Users\qtran\Desktop\whale_map.xlsx"    # Quang's path
 
 
 

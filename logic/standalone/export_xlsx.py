@@ -1,26 +1,23 @@
 '''
-Logic module that can
- - TBA
+Logic module for cli_export_xl
+
 
 USAGE EXAMPLE:
 	main_logic.logic(playdo)
+
 '''
-
-import os
 import logic.common.log_utils as log
-import logic.common.tiled_utils as tiled_utils
-
 import openpyxl
 from openpyxl.styles import PatternFill
 
 #-----------------------------------------------------#
 #-------------------- [Variables] --------------------#
 
-# Output
+# XML Configurations
 layer_name = "BG"
 
 
-
+# Spreadsheet Format
 column_width = 30    # (in pixels) Width of each column in the spreadsheet
 
 bg_hex     = "0076a3"    # dict_id_to_hex[411+1]
@@ -62,9 +59,10 @@ dict_id_to_hex = {
 #-------------------- [Public Functions] --------------------#
 
 def logic(playdo, filepath_output):
-	'''TODO'''
-	log.Must('')
-#	log.Must(f'Do the thing {1}')
+	'''
+	 Reads the XML and output a XLSX spreadsheet in the designated filepath
+	'''
+	log.Must(f'  Reading the map data...')
 
 	# Map data
 	num_row = playdo.map_height
@@ -79,6 +77,7 @@ def logic(playdo, filepath_output):
 	map_simple = [[empty_id for _ in range(num_col)] for _ in range(num_row)]
 
 	# Check each cell in Tiled
+	# The color data and max/min range is recorded, latter is shown as message
 	tiles2d = playdo.GetTiles2d(layer_name)
 	list_key = list(dict_id_to_hex.keys())
 	for i in range(num_row):
@@ -91,12 +90,11 @@ def logic(playdo, filepath_output):
 			for key, value in dict_id_to_hex.items():
 				if tiles2d[i][j] != key: continue
 				map_simple[i][j]  = list_key.index(key)
+	log.Must(f"   Map W: {num_col}, Map H: {num_row}")
+	log.Must(f"    Min X: {min_x}, Min Y: {min_y}")
+	log.Must(f"    Max X: {max_x}, Max Y: {max_y}")
 
-	log.Must(f"  Map W: {num_col}, Map H: {num_row}")
-	log.Must(f"   Min X: {min_x}, Min Y: {min_y}")
-	log.Must(f"   Max X: {max_x}, Max Y: {max_y}")
-
-#	PrintInConsole(map_simple)
+#	PrintInConsole(map_simple, empty_id)
 	ExportXlsx(map_simple, filepath_output, min_x, min_y, max_x, max_y)
 	log.Must('')
 
@@ -106,16 +104,21 @@ def logic(playdo, filepath_output):
 #-------------------- [Helper Functions] --------------------#
 
 def ExportXlsx(map_simple, filepath_output, min_x, min_y, max_x, max_y):
+	'''
+	 This exports the XLSX based on the recorded coloring data
+	'''
+
 	# Create a new workbook and select the active worksheet
 	wb = openpyxl.Workbook()
 	ws = wb.active
 
+	# Creates an array for just the color hex values
 	list_fill = []
 	for key, value in dict_id_to_hex.items():
 		list_fill.append( PatternFill(start_color = value, end_color = value, fill_type="solid") )
 	list_fill.append( PatternFill(fill_type=None) )
 
-	# 1. Paint a 5x5 grid (Rows 1 to 5, Columns A to E) black
+	# Enter data to corresponding cells based on map data
 	num_row = len(map_simple)
 	num_col = len(map_simple[0])
 	for row in range(num_row):
@@ -126,35 +129,38 @@ def ExportXlsx(map_simple, filepath_output, min_x, min_y, max_x, max_y):
 			new_x = col + 1 - min_x
 			new_y = row + 1 - min_y
 			fill_id = map_simple[row][col]
-#			ws.cell(row = new_y, column = new_x, value = " ")
-#			ws.cell(row = new_y, column = new_x).fill = list_fill[fill_id]
 			ws.cell(row = new_y, column = new_x, value = " ").fill = list_fill[fill_id]
 
-	# BG Color before adding the whale on top
+	# Set the default BG Color for the "unedited cells" and "out of bound cells"
 	bg_fill    = PatternFill( start_color = bg_hex,     end_color = bg_hex,     fill_type="solid" )
 	black_fill = PatternFill( start_color = unused_hex, end_color = unused_hex, fill_type="solid" )
 	for row in ws.iter_rows(min_row = 1, max_row = max_y):
 		for cell in row:
 			if cell.fill.fill_type in (None, "none"): cell.fill = bg_fill
-	for row in ws.iter_rows(min_row = max_y-min_y+1, max_row = 1000):
+	for row in ws.iter_rows(min_row = max_y-min_y+1, max_row = 1000):	# NOTE Somehow this line crops sheet to 273 rows
 #	for row in ws.iter_rows(min_row = max_y-min_y+1, max_row = max_y-min_y+1):
 		for cell in row: cell.fill = black_fill
 #	for row in ws.iter_rows(min_row = max_y-min_y+2, max_row = 1000):
 #		for cell in row: cell.fill = black_fill
 
-	# Resize for easier viewing
+	# Resize the column width so it's easier to fit into the screen
 	for col in ws.columns:
 		column_letter = col[0].column_letter
-		ws.column_dimensions[column_letter].width = column_width / 7    # Measure in character, each is ~ 7 pixels
+		ws.column_dimensions[column_letter].width = column_width / 7    # Function uses "character" as measurement, each ~7px
 
 	# Save the workbook
+	# NOTE The trimming functions don't seem to work at all either
 #	trim_empty_borders(ws)
 	wb.save(filepath_output)
 #	delete_at_up_and_left(filepath_output)
 
 
 
-def PrintInConsole(map_simple):
+def PrintInConsole(map_simple, empty_id):
+	'''
+	 Prints the map data on console instead
+	 For debugging, and in case want to switch over to the "copy-paste plain text" method
+	'''
 	num_row = len(map_simple)
 	num_col = len(map_simple[0])
 	print_msg = ""
@@ -167,7 +173,7 @@ def PrintInConsole(map_simple):
 			else:                            print_msg += f"{map_simple[i][j]}"
 			print_msg += " "
 		print_msg += "\n"
-	print(print_msg)
+	log.Must(print_msg)
 
 
 
@@ -251,23 +257,6 @@ def delete_at_up_and_left(filepath):
 		ws.delete_cols(1, first_data_col - 1)
 
 	wb.save(filepath)
-
-
-
-
-
-#-----------------------------------------------------------#
-#-------------------- [General Utility] --------------------#
-# to be relocated?
-
-def _Indent(s, min_len):
-	'''Return the same string, with consistent spacing added to the end'''
-	return ( s + ' ' * (min_len-len(s)) )
-
-def _FormatNumS2TU(num_in_str):
-	'''Shortcut, for converting string (coordinates measured in pixels) intoto Tiled units'''
-	if num_in_str == None: return ''
-	return str(int( round(float(num_in_str))/16 ))
 
 
 
