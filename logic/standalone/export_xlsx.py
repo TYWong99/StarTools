@@ -4,9 +4,6 @@ Logic module that can
 
 USAGE EXAMPLE:
 	main_logic.logic(playdo)
-	raw_dict = conflict.CheckConflicts(playdo, _LIST_LIGHTING_OBJ)
-	pruned_dict = conflict.PruneConflicts(playdo, conflict_dictionary)
-	conflict.FixConflicts(playdo, pruned_dict)
 '''
 
 import os
@@ -20,12 +17,14 @@ from openpyxl.styles import PatternFill
 #-------------------- [Variables] --------------------#
 
 # Output
-_output_folder1 = "output/"
-_output_folder2 = _output_folder1 + "levels/"
-_output_file    = _output_folder1 + "_merged.txt"
+layer_name = "BG"
 
-filepath_output  = "/Users/Jimmy/Desktop/test.xlsx"
 
+
+column_width = 30    # (in pixels) Width of each column in the spreadsheet
+
+bg_hex     = "0076a3"    # dict_id_to_hex[411+1]
+unused_hex = "000000"
 dict_id_to_hex = {
 	 16+1:"6858d0",
 	 17+1:"b961e9",
@@ -62,12 +61,12 @@ dict_id_to_hex = {
 #------------------------------------------------------------#
 #-------------------- [Public Functions] --------------------#
 
-def logic(playdo):
+def logic(playdo, filepath_output):
 	'''TODO'''
 	log.Must('')
 #	log.Must(f'Do the thing {1}')
 
-
+	# Map data
 	num_row = playdo.map_height
 	num_col = playdo.map_width
 	min_x = num_col
@@ -75,10 +74,12 @@ def logic(playdo):
 	max_x = 0
 	max_y = 0
 
+	# Initialise the array
 	empty_id = -1
 	map_simple = [[empty_id for _ in range(num_col)] for _ in range(num_row)]
 
-	tiles2d = playdo.GetTiles2d("BG")
+	# Check each cell in Tiled
+	tiles2d = playdo.GetTiles2d(layer_name)
 	list_key = list(dict_id_to_hex.keys())
 	for i in range(num_row):
 		for j in range(num_col):
@@ -87,12 +88,75 @@ def logic(playdo):
 			if min_y > i: min_y = i
 			if max_x < j: max_x = j
 			if max_y < i: max_y = i
-#			map_simple[i][j] = 1
 			for key, value in dict_id_to_hex.items():
 				if tiles2d[i][j] != key: continue
 				map_simple[i][j]  = list_key.index(key)
-	print(f"Min X: {min_x}, Min Y: {min_y}")
 
+	log.Must(f"  Map W: {num_col}, Map H: {num_row}")
+	log.Must(f"   Min X: {min_x}, Min Y: {min_y}")
+	log.Must(f"   Max X: {max_x}, Max Y: {max_y}")
+
+#	PrintInConsole(map_simple)
+	ExportXlsx(map_simple, filepath_output, min_x, min_y, max_x, max_y)
+	log.Must('')
+
+
+
+#------------------------------------------------------------#
+#-------------------- [Helper Functions] --------------------#
+
+def ExportXlsx(map_simple, filepath_output, min_x, min_y, max_x, max_y):
+	# Create a new workbook and select the active worksheet
+	wb = openpyxl.Workbook()
+	ws = wb.active
+
+	list_fill = []
+	for key, value in dict_id_to_hex.items():
+		list_fill.append( PatternFill(start_color = value, end_color = value, fill_type="solid") )
+	list_fill.append( PatternFill(fill_type=None) )
+
+	# 1. Paint a 5x5 grid (Rows 1 to 5, Columns A to E) black
+	num_row = len(map_simple)
+	num_col = len(map_simple[0])
+	for row in range(num_row):
+		if row < min_y: continue
+		for col in range(num_col):
+			if col < min_x: continue
+			if map_simple[row][col] < 0: continue
+			new_x = col + 1 - min_x
+			new_y = row + 1 - min_y
+			fill_id = map_simple[row][col]
+#			ws.cell(row = new_y, column = new_x, value = " ")
+#			ws.cell(row = new_y, column = new_x).fill = list_fill[fill_id]
+			ws.cell(row = new_y, column = new_x, value = " ").fill = list_fill[fill_id]
+
+	# BG Color before adding the whale on top
+	bg_fill    = PatternFill( start_color = bg_hex,     end_color = bg_hex,     fill_type="solid" )
+	black_fill = PatternFill( start_color = unused_hex, end_color = unused_hex, fill_type="solid" )
+	for row in ws.iter_rows(min_row = 1, max_row = max_y):
+		for cell in row:
+			if cell.fill.fill_type in (None, "none"): cell.fill = bg_fill
+	for row in ws.iter_rows(min_row = max_y-min_y+1, max_row = 1000):
+#	for row in ws.iter_rows(min_row = max_y-min_y+1, max_row = max_y-min_y+1):
+		for cell in row: cell.fill = black_fill
+#	for row in ws.iter_rows(min_row = max_y-min_y+2, max_row = 1000):
+#		for cell in row: cell.fill = black_fill
+
+	# Resize for easier viewing
+	for col in ws.columns:
+		column_letter = col[0].column_letter
+		ws.column_dimensions[column_letter].width = column_width / 7    # Measure in character, each is ~ 7 pixels
+
+	# Save the workbook
+#	trim_empty_borders(ws)
+	wb.save(filepath_output)
+#	delete_at_up_and_left(filepath_output)
+
+
+
+def PrintInConsole(map_simple):
+	num_row = len(map_simple)
+	num_col = len(map_simple[0])
 	print_msg = ""
 	for i in range(num_row):
 		for j in range(num_col):
@@ -103,61 +167,14 @@ def logic(playdo):
 			else:                            print_msg += f"{map_simple[i][j]}"
 			print_msg += " "
 		print_msg += "\n"
-#	print(print_msg)
-
-#	make_xlsx()
-#	color_xlsx()
-	ExportXlsx(map_simple, filepath_output, min_x, min_y, max_x, max_y)
-
-	log.Must('')
-
-def ExportXlsx(map_simple, filepath_output, min_x, min_y, max_x, max_y):
-
-	# Create a new workbook and select the active worksheet
-	wb = openpyxl.Workbook()
-	ws = wb.active
-
-	list_fill = []
-	for key, value in dict_id_to_hex.items():
-		list_fill.append( PatternFill(start_color = value, end_color = value, fill_type="solid") )
-	list_fill.append( PatternFill(fill_type=None) )
-#	print(list_fill)
-
-	# 1. Paint a 5x5 grid (Rows 1 to 5, Columns A to E) black
-	num_row = len(map_simple)
-	num_col = len(map_simple[0])
-#	min_x -= 1
-#	min_y -= 1
-	for row in range(num_row):
-		if row < min_y: continue
-		for col in range(num_col):
-			if col < min_x: continue
-			if map_simple[row][col] < 0: continue
-#			fill_color = PatternFill(start_color = "000000", end_color = "000000", fill_type="solid")
-#			ws.cell(row=row+1, column=col+1).fill = fill_color
-			fill_id = map_simple[row][col]
-#			ws.cell(row=row+1, column=col+1).fill = list_fill[fill_id]
-#			ws.cell(row=row+1, column=col+1, value = " ")
-			ws.cell(row=row+1-min_y, column=col+1-min_x).fill = list_fill[fill_id]
-			ws.cell(row=row+1-min_y, column=col+1-min_x, value = " ")
-#			ws.cell(row=row+1, column=col+1).value = " "
-
-	black_fill = PatternFill( start_color="000000", end_color="000000", fill_type="solid" )
-	for row in ws.iter_rows(min_row = max_y-min_y+1, max_row = 1000):
-		for cell in row:
-			cell.fill = black_fill
-
-	for col in ws.columns:
-		column_letter = col[0].column_letter
-		ws.column_dimensions[column_letter].width = 30/7    # Measure in character, each is ~ 7 pixels
-
-	# Save the workbook
-#	trim_empty_borders(ws)
-	wb.save(filepath_output)
-#	delete_at_up_and_left(filepath_output)
+	print(print_msg)
 
 
 
+
+
+#------------------------------------------------------------#
+#-------------------- [Unused Functions] --------------------#
 
 def trim_empty_borders(ws):
     # 1. Find the minimum and maximum row/column indices containing actual data
@@ -234,10 +251,6 @@ def delete_at_up_and_left(filepath):
 		ws.delete_cols(1, first_data_col - 1)
 
 	wb.save(filepath)
-
-
-
-
 
 
 
