@@ -119,16 +119,18 @@ def logic(playdo, filepath_output):
 #-------------------- [Helper Functions] --------------------#
 
 def AddFreezeLabel(ws, num_rows):
+	'''
+	  Add Number & Syntax to the top row & left column, then freeze them
+	'''
 
 	ws.insert_cols(idx=1)
 	ws.insert_rows(idx=1)
 
-	# Top-row - Number & Syntax
-	num = 0
+	# Top-row
+	num = -1
 	for col in ws.columns:
 		column_letter = col[0].column_letter
 		cell = ws[f"{column_letter}1"]
-#		ws[f"{column_letter}1"] = num
 		cell.value     = num
 		cell.font      = Font(bold=True, underline="single")
 		cell.alignment = Alignment(horizontal="center", vertical="center")
@@ -137,11 +139,12 @@ def AddFreezeLabel(ws, num_rows):
 	# Add number in left-column
 	for i in range(num_rows+1):
 		cell = ws[f"A{i+1}"]
-		cell.value     = i
+		cell.value     = num_rows - i
 		cell.font      = Font(bold=True, underline="single")
 		cell.alignment = Alignment(horizontal="center", vertical="center")
 
 	# Freeze first row and column
+	ws[f"A1"] = ""
 	ws.freeze_panes = "B2"
 
 

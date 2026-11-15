@@ -17,9 +17,9 @@ import logic.standalone.export_xlsx as main_logic
 
 # In-editor object layers for nodes & routes
 level_name_input = "map_simplified.xml"
-filepath_output  =  "/Users/Jimmy/Desktop/whale_map.xlsx"      # TY's path
-filepath_output  = r"C:\Users\qtran\Desktop\whale_map.xlsx"    # Quang's path
-
+path_t           =  "/Users/Jimmy/Desktop/whale_map.xlsx"      # TY's path
+path_q           = r"C:\Users\qtran\Desktop\whale_map.xlsx"    # Quang's path
+filepath_output  = path_q
 
 
 
