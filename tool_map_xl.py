@@ -4,7 +4,7 @@ The new XLSX contains the coloring data from the XML, and can then be imported i
 	
 USAGE EXAMPLE:
 	cd /Users/Jimmy/20-GitHub/StarTools
-	clear; python cli_export_xl.py
+	clear; python tool_map_xl.py
 '''
 import argparse
 import logic.common.log_utils as log
