@@ -14,18 +14,25 @@ import logic.common.level_playdo as play
 from pathlib import Path
 import openpyxl
 from openpyxl.styles import PatternFill, Alignment, Font
+import subprocess
+import time
+import os
+from datetime import datetime
 
 #---------------------------------------------------------------------#
 #-------------------- [Adjustable Configurations] --------------------#
 
 # In-editor object layers for nodes & routes
+level_name_input = "map_planning.xml"
 level_name_input = "map_simplified.xml"
 path_t           =  "/Users/Jimmy/Desktop/whale_map.xlsx"      # TY's path
 path_q           = r"C:\Users\qtran\Desktop\whale_map.xlsx"    # Quang's path
 filepath_output  = path_q
 
 # XML Configurations
-layer_name = "BG"
+layer_name_color  = "BG"
+layer_name_biome  = "_room_letter"
+layer_name_number = "_room_num_all"
 
 # Spreadsheet Format
 column_width = 30    # (in pixels) Width of each column in the spreadsheet
@@ -61,6 +68,8 @@ dict_id_to_hex = {
 	540+1:"7b0046",
 }
 
+dict_id_to_num    = {}
+dict_id_to_letter = {}
 
 
 
@@ -93,6 +102,7 @@ def main():
 	# Use a playdo to read/process the XML
 	playdo = play.LevelPlayDo(file_utils.GetFullLevelPath(level_name_input))
 	logic(playdo, filepath_output)
+#	PrintRoomNamesInConsole(playdo)
 
 #------------------------------------------------------------#
 #-------------------- [Public Functions] --------------------#
@@ -110,14 +120,14 @@ def logic(playdo, filepath_output):
 	min_y = num_row+1
 	max_x = 0
 	max_y = 0
+	empty_id = -1
 
 	# Initialise the array
-	empty_id = -1
 	map_simple = [[empty_id for _ in range(num_col)] for _ in range(num_row)]
 
 	# Check each cell in Tiled
 	# The color data and max/min range is recorded, latter is shown as message
-	tiles2d = playdo.GetTiles2d(layer_name)
+	tiles2d = playdo.GetTiles2d(layer_name_color)
 	list_key = list(dict_id_to_hex.keys())
 	for i in range(num_row):
 		for j in range(num_col):
@@ -151,8 +161,121 @@ def logic(playdo, filepath_output):
 
 
 
-#------------------------------------------------------------#
-#-------------------- [Helper Functions] --------------------#
+#---------------------------------------------------------#
+#-------------------- [TXT Functions] --------------------#
+
+def PrintRoomNamesInConsole(playdo):
+
+	num_row = playdo.map_height
+	num_col = playdo.map_width
+	min_x = num_col+1
+	min_y = num_row+1
+	max_x = 0
+	max_y = 0
+	empty_id = -1
+
+	# Set up the dictionary : TileID -> Number, TileID -> Biome Letter
+	MakeDictIdToNum()
+
+	# Initialise the array
+	map_output = [[empty_id for _ in range(num_col)] for _ in range(num_row)]
+
+	tiles2d_letter = playdo.GetTiles2d(layer_name_biome)
+	tiles2d_number = playdo.GetTiles2d(layer_name_number)
+	list_key = list(dict_id_to_hex.keys())
+	for i in range(num_row):
+		for j in range(num_col):
+			if     tiles2d_number[i][j] == 0:              continue
+			if not tiles2d_number[i][j] in dict_id_to_num: continue
+			
+			if min_x > j: min_x = j
+			if min_y > i: min_y = i
+			if max_x < j: max_x = j + 1
+			if max_y < i: max_y = i + 1
+#			print(tiles2d_letter[i][j])
+			map_output[i][j]  = dict_id_to_letter[tiles2d_letter[i][j]]
+			map_output[i][j] += dict_id_to_num[   tiles2d_number[i][j]]
+
+	log.Must(f"   Map W: {num_col}, Map H: {num_row}")
+	log.Must(f"    Min X: {min_x}, Min Y: {min_y}")
+	log.Must(f"    Max X: {max_x}, Max Y: {max_y}")
+	log.Must("")
+
+#	for key, value in dict_id_to_num.items(): print(f"{key} : {value}")
+#	for key, value in dict_id_to_letter.items(): print(f"{key} : {value}")
+	PrintInConsole(map_output, empty_id, "   ", '\t', False)
+
+def PrintInConsole(map_simple, empty_id, empty_char = " ", separator = " ", print_in_console = True):
+	'''
+	 Prints the map data on console instead
+	 For debugging, and in case want to switch over to the "copy-paste plain text" method
+	'''
+	num_row = len(map_simple)
+	num_col = len(map_simple[0])
+	log.Must(f"  Exporting room names in plain text: {num_col}x{num_row}...")
+	log.Must(f"")
+
+	# Generate the string here
+	print_msg = f"[B2] Copy-Paste to here ; Last Exported at {datetime.now()}"
+	for i in range(num_row):
+		for j in range(num_col):
+			if map_simple[i][j] == empty_id: print_msg += empty_char
+#			else:                            print_msg += "x"
+#			else:                            print_msg += map_simple[i][j][0]
+#			else:                            print_msg += map_simple[i][j] // 10
+			else:                            print_msg += f"{map_simple[i][j]}"
+			print_msg += separator
+		print_msg += "\n"
+	
+	# Output to either Console or in a TXT file
+	# NOTE Make sure to close the app first before re-running, otherwise the TXT won't update
+	if print_in_console: log.Must(print_msg)
+	filepath = "map_exported.txt"
+#	filepath = input folder + "map_exported.rxt"
+	with open(filepath, "w", encoding="utf-8") as file: file.write(print_msg)
+	subprocess.run(["open", "-a", "TextEdit", filepath])
+	time.sleep(2)
+	os.remove(filepath)
+
+
+
+def MakeDictIdToNum():
+
+	# Tile ID to Room Number
+	global dict_id_to_num
+	START_ID = 789+1
+	WIDTH = 5
+	for i in range(60):
+		tile_id = START_ID + i % WIDTH + (i // WIDTH) * 128
+		num_string = ""
+		if i+1 < 10: num_string = "0"
+		num_string += f"{i+1}"
+		if i == 59: num_string = "00"
+		dict_id_to_num[tile_id] = num_string
+	dict_id_to_num[0] = "  "
+
+	# Special Cases
+	dict_id_to_num[1936+1] = "-natty"
+
+	# Tile ID to Biome Letter
+	global dict_id_to_letter
+	START_ID = 784+1
+	WIDTH = 5
+	for i in range(26):
+		tile_id = START_ID + i % WIDTH + (i // WIDTH) * 128
+		letter_string = chr(ord('A') + i)
+		dict_id_to_letter[tile_id] = letter_string
+	dict_id_to_letter[0] = " "
+
+
+
+
+
+
+
+
+#----------------------------------------------------------#
+#-------------------- [XLSX Functions] --------------------#
 
 def AddFreezeLabel(ws, num_rows):
 	'''
@@ -219,25 +342,6 @@ def ExportXlsx(ws, map_simple, min_x, min_y, max_x, max_y):
 		for cell in row: cell.fill = black_fill
 #	for row in ws.iter_rows(min_row = max_y-min_y+2, max_row = 1000):
 #		for cell in row: cell.fill = black_fill
-
-def PrintInConsole(map_simple, empty_id):
-	'''
-	 Prints the map data on console instead
-	 For debugging, and in case want to switch over to the "copy-paste plain text" method
-	'''
-	num_row = len(map_simple)
-	num_col = len(map_simple[0])
-	print_msg = ""
-	for i in range(num_row):
-		for j in range(num_col):
-			if map_simple[i][j] == empty_id: print_msg += " "
-#			else:                            print_msg += "x"
-#			else:                            print_msg += map_simple[i][j][0]
-#			else:                            print_msg += map_simple[i][j] // 10
-			else:                            print_msg += f"{map_simple[i][j]}"
-			print_msg += " "
-		print_msg += "\n"
-	log.Must(print_msg)
 
 
 
