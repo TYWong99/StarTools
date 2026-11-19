@@ -13,7 +13,7 @@ import logic.common.level_playdo as play
 
 from pathlib import Path
 import openpyxl
-from openpyxl.styles import PatternFill, Alignment, Font
+from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 import subprocess
 import time
 import os
@@ -23,19 +23,39 @@ from datetime import datetime
 #-------------------- [Adjustable Configurations] --------------------#
 
 # In-editor object layers for nodes & routes
-level_name_input = "map_planning.xml"
 level_name_input = "map_simplified.xml"
+level_name_input = "map_planning.xml"
 path_t           =  "/Users/Jimmy/Desktop/whale_map.xlsx"      # TY's path
 path_q           = r"C:\Users\qtran\Desktop\whale_map.xlsx"    # Quang's path
-filepath_output  = path_q
+filepath_output  = path_t
+
+mode_export = 1    # 1: Export color in XLSX, 2: Export name in TXT
 
 # XML Configurations
-layer_name_color  = "BG"
-layer_name_biome  = "_room_letter"
-layer_name_number = "_room_num_all"
+layer_name_color   = "BG"
+layer_name_biome   = "_room_letter"
+layer_name_number  = "_room_num_all"
+layer_name_border1 = "_map_grid_LR"
+layer_name_border2 = "_map_grid_DU"
 
 # Spreadsheet Format
 column_width = 30    # (in pixels) Width of each column in the spreadsheet
+
+grid_thickness = 'thick'   # 'thin' 'thick'
+grid_color_1   = 'FFFFFF' # Wall
+grid_color_2   = '888888' # Door
+dict_id_to_grid = {
+	"wall_l": 400+1,
+	"door_l": 528+1,
+	"wall_u": 273+1,
+	"door_u": 274+1,
+}
+dict_id_to_grid_deprec = {
+	400+1: (1, 0), # Wall at left
+	528+1: (2, 0), # Door at left
+	273+1: (0, 1), # Wall at top
+	274+1: (0, 2), # Door at top
+}
 
 bg_hex     = "0076a3"    # dict_id_to_hex[411+1]
 unused_hex = "000000"
@@ -101,13 +121,14 @@ def main():
 
 	# Use a playdo to read/process the XML
 	playdo = play.LevelPlayDo(file_utils.GetFullLevelPath(level_name_input))
-	logic(playdo, filepath_output)
-#	PrintRoomNamesInConsole(playdo)
+	if   mode_export == 1: ExportMapColorInXlsx(playdo, filepath_output)
+	elif mode_export == 2: ExportRoomNamesInTxt(playdo)
+	else: log.Must("[EROOR] - Export Mode invalid, please go to the .py file to change")
 
 #------------------------------------------------------------#
 #-------------------- [Public Functions] --------------------#
 
-def logic(playdo, filepath_output):
+def ExportMapColorInXlsx(playdo, filepath_output):
 	'''
 	 Reads the XML and output a XLSX spreadsheet in the designated filepath
 	'''
@@ -128,6 +149,7 @@ def logic(playdo, filepath_output):
 	# Check each cell in Tiled
 	# The color data and max/min range is recorded, latter is shown as message
 	tiles2d = playdo.GetTiles2d(layer_name_color)
+	if tiles2d == None: log.Must(f"  [ERROR] - Layer {layer_name_color} not found!"); return
 	list_key = list(dict_id_to_hex.keys())
 	for i in range(num_row):
 		for j in range(num_col):
@@ -142,12 +164,14 @@ def logic(playdo, filepath_output):
 	log.Must(f"   Map W: {num_col}, Map H: {num_row}")
 	log.Must(f"    Min X: {min_x}, Min Y: {min_y}")
 	log.Must(f"    Max X: {max_x}, Max Y: {max_y}")
+	log.Must('')
 
 	wb = openpyxl.Workbook()
 	ws = wb.active
 
 	# Create the new XLSX file with all the colors
 	ExportXlsx(ws, map_simple, min_x, min_y, max_x, max_y)
+	AddGridLines(ws, playdo)          # Add white grid lines for each room
 	AddFreezeLabel(ws, max_y - min_y) # Add a column & row to the left & top side respectively
 	ResizeColumns(ws)                 # Resize all columns to smaller width
 
@@ -164,48 +188,39 @@ def logic(playdo, filepath_output):
 #---------------------------------------------------------#
 #-------------------- [TXT Functions] --------------------#
 
-def PrintRoomNamesInConsole(playdo):
-
+def ExportRoomNamesInTxt(playdo):
+	'''
+	 Generate a TXT file that contains the room names at corresponding cell position
+	 The entire content can be copy-pasted directly onto the spreadsheet, starting at top-left [B2]
+	'''
 	num_row = playdo.map_height
 	num_col = playdo.map_width
-	min_x = num_col+1
-	min_y = num_row+1
-	max_x = 0
-	max_y = 0
 	empty_id = -1
-
-	# Set up the dictionary : TileID -> Number, TileID -> Biome Letter
-	MakeDictIdToNum()
 
 	# Initialise the array
 	map_output = [[empty_id for _ in range(num_col)] for _ in range(num_row)]
 
+	# Set up the dictionary : TileID -> Number, TileID -> Biome Letter
+	MakeDictIdToNum()
+#	for key, value in dict_id_to_num.items(): print(f"{key} : {value}")
+#	for key, value in dict_id_to_letter.items(): print(f"{key} : {value}")
+
+	# Read map data into string
 	tiles2d_letter = playdo.GetTiles2d(layer_name_biome)
 	tiles2d_number = playdo.GetTiles2d(layer_name_number)
-	list_key = list(dict_id_to_hex.keys())
 	for i in range(num_row):
 		for j in range(num_col):
 			if     tiles2d_number[i][j] == 0:              continue
 			if not tiles2d_number[i][j] in dict_id_to_num: continue
-			
-			if min_x > j: min_x = j
-			if min_y > i: min_y = i
-			if max_x < j: max_x = j + 1
-			if max_y < i: max_y = i + 1
-#			print(tiles2d_letter[i][j])
 			map_output[i][j]  = dict_id_to_letter[tiles2d_letter[i][j]]
 			map_output[i][j] += dict_id_to_num[   tiles2d_number[i][j]]
-
-	log.Must(f"   Map W: {num_col}, Map H: {num_row}")
-	log.Must(f"    Min X: {min_x}, Min Y: {min_y}")
-	log.Must(f"    Max X: {max_x}, Max Y: {max_y}")
+	log.Must(f"  Map W: {num_col}, Map H: {num_row}")
 	log.Must("")
 
-#	for key, value in dict_id_to_num.items(): print(f"{key} : {value}")
-#	for key, value in dict_id_to_letter.items(): print(f"{key} : {value}")
-	PrintInConsole(map_output, empty_id, "   ", '\t', False)
+	# Export into TXT file
+	_ExportMapToString(map_output, empty_id, "   ", '\t', False)
 
-def PrintInConsole(map_simple, empty_id, empty_char = " ", separator = " ", print_in_console = True):
+def _ExportMapToString(map_simple, empty_id, empty_char = " ", separator = " ", print_in_console = True):
 	'''
 	 Prints the map data on console instead
 	 For debugging, and in case want to switch over to the "copy-paste plain text" method
@@ -216,7 +231,7 @@ def PrintInConsole(map_simple, empty_id, empty_char = " ", separator = " ", prin
 	log.Must(f"")
 
 	# Generate the string here
-	print_msg = f"[B2] Copy-Paste to here ; Last Exported at {datetime.now()}"
+	print_msg = f"[B2] Copy-Paste to here ; Last Exported at {datetime.now().replace(microsecond=0)}"
 	for i in range(num_row):
 		for j in range(num_col):
 			if map_simple[i][j] == empty_id: print_msg += empty_char
@@ -230,12 +245,15 @@ def PrintInConsole(map_simple, empty_id, empty_char = " ", separator = " ", prin
 	# Output to either Console or in a TXT file
 	# NOTE Make sure to close the app first before re-running, otherwise the TXT won't update
 	if print_in_console: log.Must(print_msg)
+	log.Must(f"  Opening the generated TXT automatically...")
 	filepath = "map_exported.txt"
 #	filepath = input folder + "map_exported.rxt"
 	with open(filepath, "w", encoding="utf-8") as file: file.write(print_msg)
 	subprocess.run(["open", "-a", "TextEdit", filepath])
-	time.sleep(2)
+	time.sleep(1)
 	os.remove(filepath)
+	log.Must(f"   Generated TXT deleted")
+	log.Must(f"")
 
 
 
@@ -276,6 +294,33 @@ def MakeDictIdToNum():
 
 #----------------------------------------------------------#
 #-------------------- [XLSX Functions] --------------------#
+
+
+def AddGridLines(ws, playdo):
+
+	log.Must('  Adding gridlines to XLSX...')
+	num_row = playdo.map_height
+	num_col = playdo.map_width
+
+	# Initialise the array
+	wall_gridline = Side(style=grid_thickness, color=grid_color_1)
+	door_gridline = Side(style=grid_thickness, color=grid_color_2)
+
+	# Read map data into string
+	tiles2d_lr = playdo.GetTiles2d(layer_name_border1)
+	tiles2d_du = playdo.GetTiles2d(layer_name_border2)
+	for i in range(num_row):
+		for j in range(num_col):
+			gridline_l = None
+			gridline_u = None
+			if tiles2d_lr[i][j] == dict_id_to_grid["wall_l"]: gridline_l = wall_gridline
+			if tiles2d_lr[i][j] == dict_id_to_grid["door_l"]: gridline_l = door_gridline
+			if tiles2d_du[i][j] == dict_id_to_grid["wall_u"]: gridline_u = wall_gridline
+			if tiles2d_du[i][j] == dict_id_to_grid["door_u"]: gridline_u = door_gridline
+			ws.cell(row = i+1, column = j+1).border = Border(left=gridline_l, top=gridline_u)
+	log.Must("")
+
+
 
 def AddFreezeLabel(ws, num_rows):
 	'''
