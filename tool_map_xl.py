@@ -33,6 +33,7 @@ mode_export = 1    # 1: Export color in XLSX, 2: Export name in TXT
 
 # XML Configurations
 layer_name_color   = "FILL"
+layer_name_icon    = "ICON"
 layer_name_biome   = "_room_letter"
 layer_name_number  = "_room_num_all"
 layer_name_border1 = "_map_grid_LR"
@@ -51,6 +52,8 @@ dict_grid_to_id = {
 	"door_u": 274+1,
 }
 
+room_color_save = '00FFFF' # Save rooms - Cyan
+room_color_warp = '32CD32' # Warp rooms - Lime Green
 dict_room_to_id = {
 	"warp": [145+1,],
 	"save": [144+1,146+1,148+1,149+1,],
@@ -269,23 +272,33 @@ def AddColorToXlsx(ws, playdo):
 	num_row = playdo.map_height
 	num_col = playdo.map_width
 
-	# The color data and max/min range is recorded, latter is shown as message
-	tiles2d = playdo.GetTiles2d(layer_name_color)
-	if tiles2d == None: log.Must(f"  [ERROR] - Layer {layer_name_color} not found!"); return
-
 	# Creates an array for just the color hex values
 	list_key = list(dict_id_to_hex.keys())
-	list_fill = []
-	for key, value in dict_id_to_hex.items():
-		list_fill.append( PatternFill(start_color = value, end_color = value, fill_type="solid") )
-	list_fill.append( PatternFill(fill_type=None) )
+	dict_id_to_fill = {}
+	for key, value in dict_id_to_hex.items(): dict_id_to_fill[key] = PatternFill(start_color = value, end_color = value, fill_type="solid")
+	for ID in dict_room_to_id["save"]: dict_id_to_fill[ID] = PatternFill(start_color = room_color_save, end_color = room_color_save, fill_type="solid")
+	for ID in dict_room_to_id["warp"]: dict_id_to_fill[ID] = PatternFill(start_color = room_color_warp, end_color = room_color_warp, fill_type="solid")
 
 	# Fill color to the XLSX
+	tiles2d = playdo.GetTiles2d(layer_name_color)
+	if tiles2d == None: log.Must(f"  [ERROR] - Layer {layer_name_color} not found!"); return
 	for i in range(num_row):
 		for j in range(num_col):
-			if not tiles2d[i][j] in list_key: continue
-			hex = dict_id_to_hex[tiles2d[i][j]]
-			fill = PatternFill(start_color = hex, end_color = hex, fill_type="solid")
+#			if not tiles2d[i][j] in list_key: continue
+			if not tiles2d[i][j] in dict_id_to_fill.keys(): continue
+#			hex = dict_id_to_hex[tiles2d[i][j]]
+#			fill = PatternFill(start_color = hex, end_color = hex, fill_type="solid")
+			fill = dict_id_to_fill[tiles2d[i][j]]
+			ws.cell(row = i+1, column = j+1, value = " ").fill = fill
+
+	# Special case - Warp and Save room
+	tiles2d_icon = playdo.GetTiles2d(layer_name_icon)
+	for i in range(num_row):
+		if tiles2d_icon == None: log.Must("   Icon layer not found, omitting check..."); break
+		for j in range(num_col):
+			if tiles2d[i][j] == 0: continue                          # Quick filter
+			if not tiles2d[i][j] in dict_id_to_fill.keys(): continue # Safety check
+			fill = dict_id_to_fill[tiles2d[i][j]]
 			ws.cell(row = i+1, column = j+1, value = " ").fill = fill
 
 	# Set the default BG Color for the "unedited cells" and "out of bound cells"
