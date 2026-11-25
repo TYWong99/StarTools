@@ -25,9 +25,10 @@ from datetime import datetime
 # In-editor object layers for nodes & routes
 level_name_input = "map_simplified.xml"
 level_name_input = "map_planning.xml"
+level_name_input = "map_export_xlsx.xml"
 path_t           =  "/Users/Jimmy/Desktop/whale_map.xlsx"      # TY's path
 path_q           = r"C:\Users\qtran\Desktop\whale_map.xlsx"    # Quang's path
-filepath_output  = path_t
+filepath_output  = path_q
 
 mode_export = 1    # 1: Export color in XLSX, 2: Export name in TXT
 
