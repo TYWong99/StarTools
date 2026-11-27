@@ -5,6 +5,7 @@ The new XLSX contains the coloring data from the XML, and can then be imported i
 USAGE EXAMPLE:
 	cd /Users/Jimmy/20-GitHub/StarTools
 	clear; python tool_map_xl.py
+	clear; python tool_map_xl.py --filename map_planning
 '''
 import argparse
 import logic.common.log_utils as log
@@ -25,12 +26,12 @@ import copy
 #---------------------------------------------------------------------#
 #-------------------- [Adjustable Configurations] --------------------#
 
-# Input filename of the map XML, housed in the usual "levels" folder
+# Input filename (Default) of the map XML, housed in the usual "levels" folder
 # NOTE Only the bottommost will be used, the rest ignored
 level_name_input = "map_simplified.xml"
-level_name_input = "map_planning.xml"
 level_name_input = "map_export_xlsx.xml"
 level_name_input = "map_simplified2.xml"
+level_name_input = "map_planning.xml"
 
 # Output filepath of the exported XLSX
 path_t           =  "/Users/Jimmy/Desktop/whale_map.xlsx"      # TY's path
@@ -45,13 +46,18 @@ config_grid_export     = False    # Print the hardcode values through the automa
 
 
 # XML Configurations
-layer_name_color      = "FILL"
-layer_name_icon       = "ICON"
 layer_name_biome      = "_room_letter"
 layer_name_number     = "_room_num_all"
-layer_name_border_raw = "LINE"
 layer_name_border1    = "_map_grid_LR"
 layer_name_border2    = "_map_grid_DU"
+layer_name_border_raw = "4.MapLine"
+list_name_fill = [    # Color in the Top layer overwrites the lower layers'
+#	"ICON",
+#	"FILL",
+	"3.ExploredFill",
+	"2.OrganShapeFill",
+	"1.WhaleShapeFill",
+]
 
 # Spreadsheet Format
 column_width = 30    # (in pixels) Width of each column in the spreadsheet
@@ -115,14 +121,20 @@ dict_id_to_letter = {}
 #-------------------- [Main] --------------------#
 
 arg_description = 'Process a simplified map XML and export a XLSX with colors'
+arg_help1 = 'Name of the tiled level XML containing the map data'
 arg_help2 = 'Controls the amount of information displayed to screen. 0 = nearly silent, 2 = verbose'
 
 def main():
 	# Use argparse to get the filename & other optional arguments from the command line
 	parser = argparse.ArgumentParser(description = arg_description)
+	parser.add_argument('--filename', type=str, help = arg_help1, default=None)
 	parser.add_argument('--v', type=int, choices=[0, 1, 2], default=1, help = arg_help2)
 	args = parser.parse_args()
 	log.SetVerbosityLevel(args.v)
+
+	# If filename is explicitly provided, use that instead of the default file
+	filename = level_name_input
+	if args.filename != None: filename = args.filename
 
 	# Check if address exists, exit and do nothing if so
 	output_folder = filepath_output
@@ -137,7 +149,7 @@ def main():
 		return
 
 	# Use a playdo to read/process the XML
-	playdo = play.LevelPlayDo(file_utils.GetFullLevelPath(level_name_input))
+	playdo = play.LevelPlayDo(file_utils.GetFullLevelPath(filename))
 	if   mode_export == 1: ExportMapColorInXlsx(playdo, filepath_output)
 	elif mode_export == 2: ExportRoomNamesInTxt(playdo)
 	else: log.Must("[EROOR] - Export Mode invalid, please go to the .py file to change")
@@ -152,7 +164,12 @@ def main():
 def ExportMapColorInXlsx(playdo, filepath_output):
 	'''
 	 Reads the XML and output a XLSX spreadsheet in the designated filepath
+	  - Color, mostly 1:1 from XML file
+	  - Grid,  mostly 1:1 from XML file
+	  - First row & column frozen and contain coordinate data
+	  - Column resized to make viewing easier
 	'''
+	log.Must(f'{playdo.full_file_name}')
 	log.Must(f'  Exporting XLSX from map data - {playdo.map_width} x {playdo.map_height}')
 	wb = openpyxl.Workbook()
 	ws = wb.active
@@ -160,13 +177,13 @@ def ExportMapColorInXlsx(playdo, filepath_output):
 	# Create the new XLSX file with all the colors
 	AddColorToXlsx(ws, playdo)
 	AddGridlinesToXlsx(ws, playdo)        # Add white grid lines for each room
-	if not True: log.Must(""); return
+#	if True: log.Must(""); return
 	AddFreezeLabel(ws, playdo.map_height) # Add a column & row to the left & top side respectively
 	ResizeColumns(ws)                     # Resize all columns to smaller width
 
 	# Save spreadsheet to filepath
 	log.Must('')
-	log.Must(f"  Exporting at : f{filepath_output}")
+	log.Must(f"  Exporting at : {filepath_output}")
 	log.Must(f"   Rows: {ws.max_row}, Columns: {ws.max_column}")
 	wb.save(filepath_output)
 
@@ -181,12 +198,20 @@ def ExportMapColorInXlsx(playdo, filepath_output):
 
 def AddGridlinesToXlsx(ws, playdo):
 	'''
-	 TODO
+	 Add grid lines to the exported XLSX file
+	 Use 1 of the 3 methods: (currently 3rd)
+	  1. Read data from the pre-process layers - Requires auto-tiling before running tool
+	  2. Read directly the layer data, with image - Requires tilesheet at specific locations
+	  3. Read directly the layer data, with image - Requires the generated list from (2)
 	'''
 	log.Must('  Adding gridlines to XLSX...')
 
 	# For the pre-process method, tool reads the 2 auto-tiled output layers instead
 	if config_grid_preprocess: AddGridFromPreprocessed(ws, playdo); return
+
+	# Before starting, check if the input tilelayer exists first
+	tiles2d = playdo.GetTiles2d(layer_name_border_raw)
+	if tiles2d == None: log.Must('   Grid layers not found, skipping operation...'); return
 
 	# Set up the dictionary
 	if config_grid_hardcode: _SetDictWallHardcoded()
@@ -196,16 +221,14 @@ def AddGridlinesToXlsx(ws, playdo):
 	wall_gridline = Side(style=grid_thickness, color=grid_color_1)
 	door_gridline = Side(style=grid_thickness, color=grid_color_2)
 
-	# Read map data into string
+	# Read map data
 	num_row = playdo.map_height
 	num_col = playdo.map_width
-	tiles2d = playdo.GetTiles2d(layer_name_border_raw)
-	if tiles2d == None: log.Must('   Grid layers not found, skipping operation...'); return
 	log.Must('   Reading grid layers...')
 	for i in range(num_row):
 		if i <= 0 or i >= num_row-1: continue
 		for j in range(num_col):
-			# Skip outermost cells to avoid out-of-bound checking
+			# NOTE Skip outermost cells to avoid out-of-bound checking
 			if j <= 0 or j >= num_col-1: continue
 
 			# Get the tile ID needed; NOTE If any of the ID is not in the dictionary, cell is skipped
@@ -216,7 +239,8 @@ def AddGridlinesToXlsx(ws, playdo):
 			if id_l not in dict_id_to_wall: continue
 			if id_u not in dict_id_to_wall: continue
 
-			# TODO
+			# Check the pointed cell and its neighboring tile
+			# NOTE Wall overrides Door in case there is a mismatch
 			gridline_l = None
 			gridline_u = None
 			if dict_id_to_wall[id_c][0] == 2 or dict_id_to_wall[id_l][1] == 2: gridline_l = door_gridline
@@ -229,7 +253,8 @@ def AddGridlinesToXlsx(ws, playdo):
 
 def _SetDictWallImage():
 	'''
-	 TODO
+	 Set up the dictionary by reading the tilesheet image each time
+	 Can export the dictionary for the Hardcode Method as well
 	'''
 	global dict_id_to_wall
 	log.Must(f"   Setting up dictionary for grid status - Image Method")
@@ -304,7 +329,7 @@ def _CheckIsWall( rgba_img, curr_id, offset ):
 
 def AddGridFromPreprocessed(ws, playdo):
 	'''
-	 TODO
+	 Add the grid from the 2 pre-processed layers - "_map_grid_LR", "_map_grid_DU"
 	'''
 	log.Must('  Adding gridlines to XLSX...')
 	num_row = playdo.map_height
@@ -352,27 +377,18 @@ def AddColorToXlsx(ws, playdo):
 	for ID in dict_room_to_id["save"]: dict_id_to_fill[ID] = PatternFill(start_color = room_color_save, end_color = room_color_save, fill_type="solid")
 	for ID in dict_room_to_id["warp"]: dict_id_to_fill[ID] = PatternFill(start_color = room_color_warp, end_color = room_color_warp, fill_type="solid")
 
-	# Fill color to the XLSX
-	tiles2d = playdo.GetTiles2d(layer_name_color)
-	if tiles2d == None: log.Must(f"  [ERROR] - Layer {layer_name_color} not found!"); return
-	for i in range(num_row):
-		for j in range(num_col):
-#			if not tiles2d[i][j] in list_key: continue
-			if not tiles2d[i][j] in dict_id_to_fill.keys(): continue
-#			hex = dict_id_to_hex[tiles2d[i][j]]
-#			fill = PatternFill(start_color = hex, end_color = hex, fill_type="solid")
-			fill = dict_id_to_fill[tiles2d[i][j]]
-			ws.cell(row = i+1, column = j+1, value = " ").fill = fill
-
-	# Special case - Warp and Save room
-	tiles2d_icon = playdo.GetTiles2d(layer_name_icon)
-	for i in range(num_row):
-		if tiles2d_icon == None: log.Must("   Icon layer not found, omitting check..."); break
-		for j in range(num_col):
-			if tiles2d[i][j] == 0: continue                          # Quick filter
-			if not tiles2d[i][j] in dict_id_to_fill.keys(): continue # Safety check
-			fill = dict_id_to_fill[tiles2d[i][j]]
-			ws.cell(row = i+1, column = j+1, value = " ").fill = fill
+	# Fill the color from all layers in the array
+	list_name_fill.reverse()
+	for name in list_name_fill:
+#		if True: print(name); continue
+		tiles2d = playdo.GetTiles2d(name)
+		if tiles2d == None: log.Must(f"   Layer \"{name}\" not found, skipping layer..."); continue
+		log.Must(f"   Setting color from layer \"{name}\"...")
+		for i in range(num_row):
+			for j in range(num_col):
+				if not tiles2d[i][j] in dict_id_to_fill.keys(): continue
+				fill = dict_id_to_fill[tiles2d[i][j]]
+				ws.cell(row = i+1, column = j+1, value = " ").fill = fill
 
 	# Set the default BG Color for the "unedited cells" and "out of bound cells"
 	bg_fill    = PatternFill( start_color = bg_hex,     end_color = bg_hex,     fill_type="solid" )
