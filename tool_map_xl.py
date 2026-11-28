@@ -226,10 +226,10 @@ def AddGridlinesToXlsx(ws, playdo):
 	num_col = playdo.map_width
 	log.Must('   Reading grid layers...')
 	for i in range(num_row):
-		if i <= 0 or i >= num_row-1: continue
+		if i <= 0: continue
 		for j in range(num_col):
 			# NOTE Skip outermost cells to avoid out-of-bound checking
-			if j <= 0 or j >= num_col-1: continue
+			if j <= 0: continue
 
 			# Get the tile ID needed; NOTE If any of the ID is not in the dictionary, cell is skipped
 			id_c = tiles2d[i  ][j  ]
@@ -247,6 +247,7 @@ def AddGridlinesToXlsx(ws, playdo):
 			if dict_id_to_wall[id_c][3] == 2 or dict_id_to_wall[id_u][2] == 2: gridline_u = door_gridline
 			if dict_id_to_wall[id_c][0] == 1 or dict_id_to_wall[id_l][1] == 1: gridline_l = wall_gridline
 			if dict_id_to_wall[id_c][3] == 1 or dict_id_to_wall[id_u][2] == 1: gridline_u = wall_gridline
+			if gridline_l == None and gridline_u == None: continue
 			ws.cell(row = i+1, column = j+1).border = Border(left=gridline_l, top=gridline_u)
 
 
@@ -359,8 +360,8 @@ def AddGridFromPreprocessed(ws, playdo):
 
 
 
-#----------------------------------------------------------#
-#-------------------- [XLSX Functions] --------------------#
+#--------------------------------------------------------------#
+#-------------------- [XLSX - Color, etc.] --------------------#
 
 def AddColorToXlsx(ws, playdo):
 	'''
@@ -378,7 +379,7 @@ def AddColorToXlsx(ws, playdo):
 	for ID in dict_room_to_id["warp"]: dict_id_to_fill[ID] = PatternFill(start_color = room_color_warp, end_color = room_color_warp, fill_type="solid")
 
 	# Fill the color from all layers in the array
-	list_name_fill.reverse()
+#	list_name_fill.reverse()
 	for name in list_name_fill:
 #		if True: print(name); continue
 		tiles2d = playdo.GetTiles2d(name)
@@ -386,9 +387,11 @@ def AddColorToXlsx(ws, playdo):
 		log.Must(f"   Setting color from layer \"{name}\"...")
 		for i in range(num_row):
 			for j in range(num_col):
+				cell = ws.cell(row = i+1, column = j+1)
+				if cell.fill and cell.fill.fill_type not in (None, "none"): continue
 				if not tiles2d[i][j] in dict_id_to_fill.keys(): continue
-				fill = dict_id_to_fill[tiles2d[i][j]]
-				ws.cell(row = i+1, column = j+1, value = " ").fill = fill
+				cell.fill  = dict_id_to_fill[tiles2d[i][j]]
+#				cell.value = " "
 
 	# Set the default BG Color for the "unedited cells" and "out of bound cells"
 	bg_fill    = PatternFill( start_color = bg_hex,     end_color = bg_hex,     fill_type="solid" )
